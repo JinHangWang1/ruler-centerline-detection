@@ -1,0 +1,177 @@
+clc
+clear all;
+img = imread('sruler5.jpg');
+w = fspecial('gaussian',[5,5],1);
+	
+%replicate:图像大小通过赋值外边界的值来扩展
+	
+%symmetric 图像大小通过沿自身的边界进行镜像映射扩展
+	
+I11 = imfilter(img,w,'replicate');
+	
+figure(1);
+	imshow(img);title('原图像');
+	
+figure(2);
+	imshow(I11);title('matlab高斯滤波后的图像');
+J= adapthisteq(I11);
+K = imadjust(J,[0 0.5],[0 1]);
+figure,imshow(K);
+I=im2bw(K,0.7);
+figure,imshow(I);
+
+
+%%分别找出两个区域的下边缘、上边缘
+[M,N]=size(I);
+ for  i=1:M
+    x(i)=0;
+     for j=1:N
+        if I(i,j)==0
+         x(i)=x(i)+1;    
+        end
+     end
+end
+    
+for i=4:M-2
+   y(i)=x(i)+x(i+1)+x(i+2)-x(i-1)-x(i-2)-x(i-3);
+end
+[a,b]=max(y(4:M-2));%a为最大值的值，b为最大值所在行，即第一个区域的下边缘
+[c,d]=min(y(4:M-2));%%c为最小值的值，d为最小值所在行，即第二个区域的上边缘
+if b>d
+    bb=b;
+    dd=d;
+[p,b]=max(y(dd+10:bb));%a为最大值的值，b为最大值所在行，即第一个区域的下边缘
+[q,d]=min(y(dd+10:bb));%%c为最小值的值，d为最小值所在行，即第二个区域的上边缘   
+b=b+10+dd-1;
+d=d+10+dd-1;
+end
+if (x(b)~=max(x(4:M-2)))&&(x(b+1)~=max(x(4:M-2)))
+    y(b)=-100;
+    [a,b]=max(y(4:M-2));%a为最大值的值，b为最大值所在行，即第一个区域的下边缘
+end
+if (x(d)~=max(x(4:M-2)))&&(x(d-1)~=max(x(4:M-2)))
+    y(d)=100;
+%%分别找出两根尺整米处所在位置
+[c,d]=min(y(b:M-2));%%c为最小值的值，d为最小值所在行，即第二个区域的上边缘
+d=b+d+1;
+end
+for j=1:N
+    length1(j)=0;
+    for i=1:b
+        if I(i,j)==0
+           length1(j)=length1(j)+1; 
+        end
+    end
+end
+[a1,b1]=max(length1(1:N));%%a1为最大值的值，b1为最大值所在行，即整米刻度线所在的列
+
+
+for j=1:N
+    length2(j)=0;
+    for i=d:M
+        if I(i,j)==0
+           length2(j)=length2(j)+1; 
+        end
+    end
+end
+[a2,b2]=max(length2(1:N));%%a2为最大值的值，b2为最大值所在行，即整米刻度线所在的列
+
+
+
+%%创建两个区域，使得这两个区域分别只包含整米刻度线
+%%待测尺整米刻度线区域  :  i=1:b    j=b1-12:b1+12 
+%%待测尺整米刻度线区域  :  i=d:M   j=b2-12:b2+12   
+
+
+%%灰度重心法
+
+
+%%刻度线左侧边缘各点坐标
+for i=1:b
+for j=b1-12:b1+12
+if I(i,j-1)==1&&I(i,j)==0
+break;   
+end
+end
+Leftx1(i)=i;
+Lefty1(i)=j;
+end
+
+for i=d:M
+for j=b2-12:b2+12
+if I(i,j-1)==1&&I(i,j)==0
+break;   
+end
+end
+Leftx2(i)=i;
+Lefty2(i)=j;
+end
+
+
+%%刻度线右侧边缘各点坐标
+for i=1:b
+for j=b1-12:b1+12
+if I(i,j)==0&&I(i,j+1)==1
+break;   
+end
+end
+Rightx1(i)=i;
+Righty1(i)=j;
+end
+
+for i=d:M
+for j=b2-12:b2+12
+if I(i,j)==0&&I(i,j+1)==1
+break;   
+end
+end
+Rightx2(i)=i;
+Righty2(i)=j;
+end
+
+
+
+%%将各点横坐标和纵坐标关联起来
+ul=[Leftx1(1:b);Lefty1(1:b)];%%待测尺左边缘点坐标
+ur=[Rightx1(1:b);Righty1(1:b)];%%待测尺右边缘点坐标
+dl=[Leftx2(d:M);Lefty2(d:M)];%%标准尺左边缘点坐标
+dr=[Rightx2(d:M);Righty2(d:M)];%%标准尺右边缘点坐标
+
+
+
+for i=1:b
+    Y1(i)=0;
+    G1(i)=0;
+    for j=Lefty1(i):Righty1(i)
+       Y1(i)=Y1(i)+double(J(i,j))*j; 
+       G1(i)=G1(i)+double(J(i,j));
+    end
+    Yc1(i)=Y1(i)/G1(i);
+end
+for i=d:d+a2
+    Y2(i)=0;
+    G2(i)=0;
+    for j=Lefty2(i):Righty2(i)
+       Y2(i)=Y2(i)+double(J(i,j))*j;
+       G2(i)=G2(i)+double(J(i,j));
+    end
+    Yc2(i)=Y2(i)/G2(i);        
+end
+
+%%求出两中心线差值
+sum1=0;
+for i=1:b
+    sum1=sum1+ Yc1(i);
+end
+y1=sum1/b;%%待测尺纵坐标
+
+sum2=0;
+for i=d:d+a2
+    sum2=sum2+ Yc2(i);
+end
+y2=sum2/a2;%%标准尺纵坐标
+
+
+error=y1-y2;
+disp('待测尺的误差为：')
+fprintf('error=%d像素\n',error)
